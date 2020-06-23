@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">RC Clone</string>
+    <string name="TAB_TEXT_SEND">SEND</string>
+    <string name="TAB_TEXT_RECEIVE">RECEIVE</string>
+    <string name="TAB_TEXT_OPTIONS">OPTIONS</string>
+
+</resources>

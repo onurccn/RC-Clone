@@ -30,8 +30,8 @@ public class SectionsPagerAdapter extends FragmentPagerAdapter {
         mContext = context;
 
         fragments = new ArrayList<>();
-        fragments.add(new PlaceholderFragment());
-        fragments.add(new PlaceholderFragment());
+        fragments.add(new SendFragment());
+        fragments.add(new ReceiveFragment());
         fragments.add(new SettingsFragment());
     }
 

@@ -1,4 +1,4 @@
-package tr.edu.gtu.rcclone;
+package tr.edu.gtu.rcclone.data.service;
 
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
@@ -10,6 +10,10 @@ import com.google.android.material.snackbar.Snackbar;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Arrays;
+
+import tr.edu.gtu.rcclone.MainActivity;
+import tr.edu.gtu.rcclone.data.models.Remote;
 
 import static tr.edu.gtu.rcclone.MainActivity.sppUUID;
 
@@ -34,12 +38,14 @@ public class RemoteBluetoothService {
 
     private int retryCount = 0;
     private boolean connected;
+    private boolean skipSanityCheck = false;
     private Thread backgroundConnectionChecker = new Thread(new Runnable() {
         @Override
         public void run() {
             while (mSocket != null) {
                 if (backgroundConnectionChecker.isInterrupted()) break;
                 if (mSocket.isConnected()) {
+                    if (skipSanityCheck) continue;
                     if (sendCommand(COMMAND.RUOK, null)) {
                         String s = receiveMessage();
                         if (s != null && s.equals("OK")){
@@ -135,31 +141,43 @@ public class RemoteBluetoothService {
         ((MainActivity)mContext).setChipStatusFail();
     }
 
-    private boolean sendCommand(COMMAND command, Object data) {
+    public boolean sendCommand(COMMAND command, Remote.RemoteCommand data) {
         try {
             switch (command) {
                 case RUOK:
                     mOutStream.write(new byte[]{'R', 'U', 'O', 'K'});
+                    break;
+                case RECV:
+                    skipSanityCheck = true;
+                    mOutStream.write(new byte[]{'R', 'E', 'C', 'V'});
+                    break;
+                case SRAW:
+                    skipSanityCheck = true;
+                    mOutStream.write(new byte[]{'R', 'W', Integer.valueOf((data.rawLength/10)).toString().getBytes()[0], Integer.valueOf((data.rawLength%10)).toString().getBytes()[0]});
+                    mOutStream.write(data.getRawSend());
+                    System.out.println("Sending " + data.rawTimes+ ":");
                     break;
             }
             mOutStream.flush();
             return true;
         }
         catch (Exception ex) {
+            skipSanityCheck = false;
             ex.printStackTrace();
             return false;
         }
     }
 
-    private String receiveMessage() {
+    public String receiveMessage() {
         try {
             byte[] buffer = new byte[300];
             int len = mInStream.read(buffer);
             if (len == 0) return null;
-
+            if (len > 2) skipSanityCheck = false;
             return new String(buffer, 0, len);
         }
         catch (Exception ex) {
+            skipSanityCheck = false;
             ex.printStackTrace();
             return null;
         }

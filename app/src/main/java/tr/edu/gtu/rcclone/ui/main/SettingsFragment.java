@@ -13,6 +13,7 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import tr.edu.gtu.rcclone.R;
+import tr.edu.gtu.rcclone.data.models.SettingsViewModel;
 
 public class SettingsFragment extends Fragment {
 

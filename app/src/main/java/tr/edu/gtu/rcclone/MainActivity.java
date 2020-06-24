@@ -11,32 +11,39 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
 
+import com.getbase.floatingactionbutton.AddFloatingActionButton;
+import com.getbase.floatingactionbutton.FloatingActionButton;
+import com.getbase.floatingactionbutton.FloatingActionsMenu;
+
 import com.google.android.material.chip.Chip;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.tabs.TabLayout;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.app.ActivityCompat;
 import androidx.viewpager.widget.ViewPager;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import java.io.IOException;
 import java.util.UUID;
 
+import tr.edu.gtu.rcclone.data.models.AppModel;
+import tr.edu.gtu.rcclone.data.service.RemoteBluetoothService;
 import tr.edu.gtu.rcclone.ui.main.SectionsPagerAdapter;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int REQUEST_LOCATION = 1;
+    private static final int REQUEST_LOCATION = 111;
     private static final int REQUEST_ENABLE_BT = 150;
     private static final int DISCOVERY_TIMEOUT_MILLIS = 12000;
     private static final int CONNECTION_MAX_RETRY = 3;
@@ -44,13 +51,16 @@ public class MainActivity extends AppCompatActivity {
 
     private BluetoothAdapter btAdapter = BluetoothAdapter.getDefaultAdapter();
     private BluetoothDevice rcClone = null;
-    private RemoteBluetoothService remoteBluetoothService = null;
+    public RemoteBluetoothService remoteBluetoothService = null;
 
     private long discoveryStartedTime = 0;
     private Thread checkConnection;
 
     public ViewPager viewPager;
     private Chip statusChip;
+    FloatingActionsMenu fabMenu;
+    AddFloatingActionButton fabAdd;
+    FloatingActionButton fabSelect;
     private MainActivity tempThis = this;
 
     private final BroadcastReceiver receiver = new BroadcastReceiver() {
@@ -89,27 +99,45 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        SectionsPagerAdapter sectionsPagerAdapter = new SectionsPagerAdapter(this, getSupportFragmentManager());
+        final SectionsPagerAdapter sectionsPagerAdapter = new SectionsPagerAdapter(this, getSupportFragmentManager());
         viewPager = findViewById(R.id.view_pager);
         viewPager.setAdapter(sectionsPagerAdapter);
         TabLayout tabs = findViewById(R.id.tabs);
         tabs.setupWithViewPager(viewPager);
         statusChip = findViewById(R.id.status_indicator);
         setChipStatusFail();
-        FloatingActionButton fab = findViewById(R.id.fab);
+        fabMenu = findViewById(R.id.multiple_actions_up);
+        fabAdd = findViewById(R.id.add_button);
+        fabSelect = findViewById(R.id.select_button);
+        fabAdd.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                onClickAdd();
+            }
+        });
+
+        fabSelect.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                viewPager.setCurrentItem(0);
+                fabMenu.collapse();
+
+
+            }
+        });
 
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES);
         getWindow().setStatusBarColor(getResources().getColor(R.color.colorBackground));
 
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
-            }
-        });
+//        fab.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View view) {
+//                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
+//                        .setAction("Action", null).show();
+//            }
+//        });
 
-        fab.setVisibility(View.GONE);
+        //fab.setVisibility(View.GONE);
 
         if (btAdapter == null) {
             Toast.makeText(this, "No bluetooth adapter found. Need one to use this application.", Toast.LENGTH_LONG).show();
@@ -127,22 +155,77 @@ public class MainActivity extends AppCompatActivity {
         //statusChipThread.start();
     }
 
+    private void onClickAdd() {
+        AppModel.currentRemoteName.setValue("");
+        viewPager.setCurrentItem(1);
+        fabMenu.collapse();
+        final AlertDialog.Builder builder = new AlertDialog.Builder(tempThis);
+        LayoutInflater inflater = tempThis.getLayoutInflater();
+        final View formView = inflater.inflate(R.layout.new_remote_form, null);
+        builder.setView(formView)
+                .setPositiveButton("Add Remote", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        EditText form  = formView.findViewById(R.id.remote_name_edit);
+                        try {
+                            System.out.println(form.getText().toString());
+                            if (form.getText().length() > 0) {
+                                AppModel.currentRemoteName.setValue(form.getText().toString());
+                                dialog.dismiss();
+                            }
+                            else {
+                                new Thread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        runOnUiThread(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                try {
+                                                    Thread.sleep(500);
+                                                }
+                                                catch (Exception ex) {
+                                                    ex.printStackTrace();
+                                                }
+                                                onClickAdd();
+                                            }
+                                        });
+                                    }
+                                }).start();
+                            }
+                        }
+                        catch (Exception ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                })
+                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.cancel();
+                    }
+                });
+        builder.show();
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        switch (requestCode) {
-            case REQUEST_ENABLE_BT:
-                if (resultCode == RESULT_OK) {
-                    startDiscovery();
+        if (requestCode == REQUEST_ENABLE_BT) {
+            if (resultCode == RESULT_OK) {
+                startDiscovery();
 
-                }
-                break;
+            }
+        }
+    }
 
-            case REQUEST_LOCATION:
-                if (resultCode == RESULT_OK) {
-                    startBTProcess();
-                }
-                break;
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_LOCATION) {
+            if (grantResults.length > 0 &&
+                    grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                startBTProcess();
+            }
         }
     }
 
@@ -258,6 +341,12 @@ public class MainActivity extends AppCompatActivity {
 
     public void setChipStatusFail() {
         isInProgress = false;
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                AppModel.isBtConnected.setValue(false);
+            }
+        });
         statusChip.setChipBackgroundColorResource(R.color.colorFail);
         statusChip.setText("");
         statusChip.clearAnimation();
@@ -266,6 +355,12 @@ public class MainActivity extends AppCompatActivity {
     public void setChipStatusConnecting() {
         if (isInProgress) return;
         isInProgress = true;
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                AppModel.isBtConnected.setValue(false);
+            }
+        });
         statusChip.setChipBackgroundColorResource(R.color.colorInProgress);
         //statusChip.setText(statusText + "...");
         Animation blink = AnimationUtils.loadAnimation(getApplicationContext(), R.anim.blink);
@@ -274,6 +369,12 @@ public class MainActivity extends AppCompatActivity {
 
     public void setChipStatusConnected() {
         isInProgress = false;
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                AppModel.isBtConnected.setValue(true);
+            }
+        });
         statusChip.setChipBackgroundColorResource(R.color.colorSuccess);
         statusChip.setText("");
         statusChip.clearAnimation();

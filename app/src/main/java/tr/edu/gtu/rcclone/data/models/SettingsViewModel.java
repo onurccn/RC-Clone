@@ -1,4 +1,4 @@
-package tr.edu.gtu.rcclone.ui.main;
+package tr.edu.gtu.rcclone.data.models;
 
 import androidx.lifecycle.ViewModel;
 

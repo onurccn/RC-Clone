@@ -22,7 +22,9 @@ public class MainApplication extends Application {
     public static RemoteDB getRemoteDB(@Nullable Context context) {
         if (remoteDB == null && context != null) {
             remoteDB = Room.databaseBuilder(context,
-                    RemoteDB.class, DB_NAME).build();
+                    RemoteDB.class, DB_NAME)
+                    .fallbackToDestructiveMigration()
+                    .build();
         }
         return remoteDB;
     }

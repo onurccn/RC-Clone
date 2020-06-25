@@ -29,4 +29,7 @@ public interface RemoteDAO {
 
     @Query("SELECT * FROM remotes")
     public List<Remote> getRemotes();
+
+    @Query("SELECT * FROM commands")
+    public List<Remote.RemoteCommand> getCommands();
 }

@@ -20,6 +20,7 @@ import com.getbase.floatingactionbutton.FloatingActionsMenu;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.tabs.TabLayout;
+import com.toptoche.searchablespinnerlibrary.SearchableSpinner;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -32,13 +33,18 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.SpinnerAdapter;
 import android.widget.Toast;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import tr.edu.gtu.rcclone.data.models.AppModel;
+import tr.edu.gtu.rcclone.data.models.Remote;
 import tr.edu.gtu.rcclone.data.service.RemoteBluetoothService;
 import tr.edu.gtu.rcclone.ui.main.SectionsPagerAdapter;
 
@@ -61,6 +67,7 @@ public class MainActivity extends AppCompatActivity {
     FloatingActionsMenu fabMenu;
     AddFloatingActionButton fabAdd;
     FloatingActionButton fabSelect;
+
     private MainActivity tempThis = this;
 
     private final BroadcastReceiver receiver = new BroadcastReceiver() {
@@ -104,7 +111,15 @@ public class MainActivity extends AppCompatActivity {
         viewPager.setAdapter(sectionsPagerAdapter);
         TabLayout tabs = findViewById(R.id.tabs);
         tabs.setupWithViewPager(viewPager);
+
         statusChip = findViewById(R.id.status_indicator);
+        statusChip.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                remoteBluetoothService.terminateConnection(true);
+                setChipStatusFail();
+            }
+        });
         setChipStatusFail();
         fabMenu = findViewById(R.id.multiple_actions_up);
         fabAdd = findViewById(R.id.add_button);
@@ -121,10 +136,9 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View v) {
                 viewPager.setCurrentItem(0);
                 fabMenu.collapse();
-
-
             }
         });
+
 
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES);
         getWindow().setStatusBarColor(getResources().getColor(R.color.colorBackground));
@@ -153,6 +167,8 @@ public class MainActivity extends AppCompatActivity {
             startBTProcess();
         }
         //statusChipThread.start();
+
+
     }
 
     private void onClickAdd() {
@@ -232,6 +248,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        if (remoteBluetoothService != null && remoteBluetoothService.backgroundConnectionChecker != null && !  remoteBluetoothService.backgroundConnectionChecker.isAlive()) {
+            remoteBluetoothService.initThread();
+        }
     }
 
     @Override
@@ -242,7 +261,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (remoteBluetoothService != null) {
-            remoteBluetoothService.terminateConnection();
+            remoteBluetoothService.terminateConnection(false);
         }
 
         try {

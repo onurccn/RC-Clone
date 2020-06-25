@@ -3,6 +3,8 @@ package tr.edu.gtu.rcclone.ui.main;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProviders;
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
@@ -16,6 +18,7 @@ import android.widget.Button;
 import android.widget.TextView;
 
 import tr.edu.gtu.rcclone.MainActivity;
+import tr.edu.gtu.rcclone.MainApplication;
 import tr.edu.gtu.rcclone.R;
 import tr.edu.gtu.rcclone.data.models.AppModel;
 import tr.edu.gtu.rcclone.data.models.ReceiveViewModel;
@@ -31,6 +34,7 @@ public class ReceiveFragment extends Fragment {
     private Button button;
     private Button receiveButton;
 
+    private boolean ignoreBT = false;
 
     private MainActivity mainActivity;
     @Override
@@ -49,34 +53,60 @@ public class ReceiveFragment extends Fragment {
                 if (mainActivity != null) {
                     if (AppModel.isBtConnected.getValue()) {
                         AppModel.command.setValue(null);
-                        receiveButton.setEnabled(false);
-                        boolean isSent = mainActivity.remoteBluetoothService.sendCommand(RemoteBluetoothService.COMMAND.RECV, null);
-                        if (isSent) {
-                            String resp = mainActivity.remoteBluetoothService.receiveMessage();
-                            if (resp != null && resp.equals("OK")) {
-                                receiveButton.setEnabled(true);
-                                int retryMax = RETRY_MAX;
-                                while(retryMax > 0) {
-                                    retryMax--;
-                                    resp = mainActivity.remoteBluetoothService.receiveMessage();
-                                    if (resp != null && resp.length() > 10) {
-                                        retryMax = 0;
-                                        text_debug.setText(resp);
-                                        String[] commandArr = resp.split(" ");
-                                        Remote.RemoteCommand command = new Remote.RemoteCommand();
-                                        command.protocol = Integer.parseInt(commandArr[0]);
-                                        command.rawLength = Integer.parseInt(commandArr[1]);
-                                        StringBuilder sb = new StringBuilder();
-                                        for (int i = 0; i < command.rawLength; i++) {
-                                            sb.append(commandArr[i + 2]);
-                                            sb.append(" ");
-                                        }
-                                        sb.deleteCharAt(sb.length() - 1);
-                                        command.rawTimes = sb.toString();
-                                        AppModel.command.setValue(command);
-                                    }
+                        RemoteBluetoothService.COMMANDObj command = new RemoteBluetoothService.COMMANDObj(RemoteBluetoothService.COMMAND.RECV, null, new RemoteBluetoothService.OnCommandResultListener() {
+                            @Override
+                            public void onCommandResult(final String response) {
+                                ignoreBT = false;
+                                String[] commandArr = response.split(" ");
+                                final Remote.RemoteCommand command = new Remote.RemoteCommand();
+                                command.protocol = Integer.parseInt(commandArr[0]); // add checks
+                                command.rawLength = Integer.parseInt(commandArr[1]);
+                                StringBuilder sb = new StringBuilder();
+                                for (int i = 0; i < command.rawLength; i++) {
+                                    sb.append(commandArr[i + 2]);
+                                    sb.append(" ");
                                 }
+                                sb.deleteCharAt(sb.length() - 1);
+                                command.rawTimes = sb.toString();
+                                if (command.protocol > 0) {
+                                    command.protocolBits = Integer.parseInt(commandArr[commandArr.length - 2]);
+                                    command.protocolValue = Long.parseLong(commandArr[commandArr.length - 1]);
+                                }
+                                command.name = AppModel.currentRemoteName.getValue();
+                                mainActivity.runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        text_debug.setText(response);
+                                        //AppModel.command.setValue(command);
+                                        receiveButton.setEnabled(true);
+
+                                        final AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
+                                        builder.setMessage("Do you want to add " + command.name + "to db?")
+                                        .setPositiveButton("YES", new DialogInterface.OnClickListener() {
+                                            @Override
+                                            public void onClick(DialogInterface dialog, int which) {
+                                                new Thread(new Runnable() {
+                                                    @Override
+                                                    public void run() {
+                                                        MainApplication.getRemoteDB(mainActivity.getApplicationContext()).remoteDAO().insertCommand(command);
+                                                    }
+                                                }).start();
+                                            }
+                                        })
+                                        .setNegativeButton("NO", null).show();
+                                    }
+                                });
                             }
+
+                            @Override
+                            public void onCommandError() {
+                                receiveButton.setEnabled(true);
+                                ignoreBT = false;
+                            }
+                        });
+                        if (mainActivity.remoteBluetoothService.commandQueue.offer(command)) {
+                            receiveButton.setEnabled(false);
+                            ignoreBT = true;
                         }
                     }
                 }
@@ -105,6 +135,7 @@ public class ReceiveFragment extends Fragment {
         AppModel.isBtConnected.observe(getViewLifecycleOwner(), new Observer<Boolean>() {
             @Override
             public void onChanged(Boolean aBoolean) {
+                if (ignoreBT) return;
                 if (aBoolean) {
                     receiveButton.setEnabled(true);
                 }

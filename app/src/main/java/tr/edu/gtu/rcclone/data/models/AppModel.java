@@ -17,4 +17,5 @@ public class AppModel {
     public static MutableLiveData<String> currentRemoteName = new MutableLiveData<>();
     public static MutableLiveData<Boolean> isBtConnected = new MutableLiveData<>(false);
     public static MutableLiveData<Remote.RemoteCommand> command = new MutableLiveData<>();
+    public static MutableLiveData<Boolean> updateCommandList = new MutableLiveData<>(false);
 }
